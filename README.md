@@ -20,28 +20,30 @@ PyVIC (Python Virtual Input Console) is an application for simulating HID device
 
 Requirements
 
-	•	Python 3.9 or higher.
-	•	Dependencies:
+Python 3.9 or higher.
+
+Dependencies:
+
 	•	pygame
 	•	opencv-python
 	•	pyserial
 
 Install dependencies with:
 
-pip install -r requirements.txt
+    pip install -r requirements.txt
 
 🚀 Usage
 
-	1.	Start the application:
+Start the application:
 
-python main.py
+    python main.py
 
 
-	2.	Test functionality:
-	•	Connect HID devices and a USB camera.
-	•	Test mouse and keyboard inputs in the Pygame window.
-	3.	Exit the application:
-	•	Press Ctrl + C or close the window.
+Test functionality:
+    •	Connect HID devices and a USB camera.
+    •	Test mouse and keyboard inputs in the Pygame window. 
+Exit the application:
+    •	Press Ctrl + C or close the window.
 
 ⚙️ Configuration
 
@@ -53,7 +55,7 @@ Camera
 
 The first available camera (/dev/video0 or ID 0) is used by default. To use another camera, modify the ID in main.py:
 
-cap = cv2.VideoCapture(<CAMERA_ID>)
+    cap = cv2.VideoCapture(<CAMERA_ID>)
 
 🖥️ Screenshots
 
