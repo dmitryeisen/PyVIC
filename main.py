@@ -28,7 +28,6 @@ def find_usbserial_port():
         raise Exception("Multiple USB-serial devices found. Please specify.")
 
 
-# Setup für den seriellen Anschluss (Anpassung für dein Gerät)
 def setup_ch9329_serial():
     try:
         port = find_usbserial_port()
@@ -42,7 +41,7 @@ def setup_ch9329_serial():
 
 latest_frame = None
 frame_lock = threading.Lock()
-stop_capture = False  # Kontrollvariable für Thread
+stop_capture = False
 layout = "us"
 
 
@@ -84,7 +83,25 @@ async def test_unit(serial_conn, frame_width, frame_height, layout):
         clock.tick(60)
 
 async def handle_pygame_event(serial_conn, event, layout):
-    if event.type == KEYDOWN:
+    if event.type == MOUSEMOTION:
+        abs_x, abs_y = event.pos  # Absolute Mausposition im Fenster
+        try:
+            mouse.move(serial_conn, abs_x, abs_y, relative=False)  # relative=False - absolute
+        except Exception as e:
+            print(f"Error while sending absolute MOUSEMOTION: {e}")
+        """
+        Relative Mouse
+        dx, dy = event.rel  # Relative mouse
+        dx = max(min(dx, 127), -127)  # CH9329 max. Value from -127 to 127
+        dy = max(min(dy, 127), -127)
+        # print(f"Mouse values: dx={dx}, dy={dy}")
+        try:
+            mouse.move(serial_conn, dx, dy, relative=True)
+        except Exception as e:
+            print(f"Error while sending absolute MOUSEMOTION: {e}")
+
+        """
+    elif event.type == KEYDOWN:
         key_code = event.unicode
         special_key = {
             pygame.K_RETURN: "enter",
@@ -108,7 +125,7 @@ async def handle_pygame_event(serial_conn, event, layout):
                     keyboard.press(serial_conn, key_code)
 
         except Exception as e:
-            print(f"Fehler beim Senden von KEYDOWN: {e}")
+            print(f"Error while sending KEYDOWN:: {e}")
 
     elif event.type == KEYUP:
         key_code = event.unicode
@@ -116,7 +133,7 @@ async def handle_pygame_event(serial_conn, event, layout):
             if key_code:
                 keyboard.release(serial_conn)
         except Exception as e:
-            print(f"Fehler beim Senden von KEYUP: {e}")
+            print(f"Error while sending KEYUP: {e}")
 
     elif event.type == MOUSEBUTTONDOWN:
         # Translate Pygame-Mouse-Buttons to CH9329-Button
@@ -126,34 +143,16 @@ async def handle_pygame_event(serial_conn, event, layout):
             try:
                 mouse.click(serial_conn, mouse_button)
             except Exception as e:
-                print(f"Fehler beim Senden von MOUSEBUTTONDOWN: {e}")
+                print(f"Error while sending MOUSEBUTTONDOWN: {e}")
         else:
-            print(f"Unbekannter Mausbutton: {event.button}")
+            print(f"Unknown mouse button: {event.button}")
 
     elif event.type == MOUSEBUTTONUP:
         mouse_button = event.button
         try:
             mouse.release(serial_conn)
         except Exception as e:
-            print(f"Fehler beim Senden von MOUSEBUTTONUP: {e}")
-    elif event.type == MOUSEMOTION:
-        abs_x, abs_y = event.pos  # Absolute Mausposition im Fenster
-        try:
-            mouse.move(serial_conn, abs_x, abs_y, relative=False)  # relative=False für absolute Bewegung
-        except Exception as e:
-            print(f"Fehler beim Senden von absoluter MOUSEMOTION: {e}")
-        """
-        Relative Mouse
-        dx, dy = event.rel  # Relative Bewegung der Maus
-        dx = max(min(dx, 127), -127)  # CH9329 max. Werte von -127 bis 127
-        dy = max(min(dy, 127), -127)
-        # print(f"Maus bewegt: dx={dx}, dy={dy}")
-        try:
-            mouse.move(serial_conn, dx, dy, relative=True)
-        except Exception as e:
-            print(f"Fehler beim Senden von MOUSEMOTION: {e}")
-
-        """
+            print(f"Error while sending MOUSEBUTTONUP: {e}")
 
 
 async def main():
@@ -162,7 +161,7 @@ async def main():
     layout = detect_keyboard_layout()
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
-        print("Fehler beim Öffnen der Kamera.")
+        print("Error while opening the camera.")
         sys.exit()
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -178,13 +177,13 @@ async def main():
             capture_thread.join()
             cap.release()
             pygame.quit()
-            print("Verbindung und Kamera geschlossen.")
+            print("Connection and camera closed.")
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("Programm beendet durch Benutzer.")
+        print("Program terminated by user.")
     finally:
         pygame.quit()
