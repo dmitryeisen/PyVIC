@@ -1,5 +1,7 @@
 # PyVIC
 
+![](/assets/pyvic.png)
+
 PyVIC (Python Virtual Input Console) is an application for simulating HID devices (keyboard and mouse) and displaying real-time screen data via camera capturing. This tool provides a simple way to test input devices and visual feedback.
 
 🛠️ Features
