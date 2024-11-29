@@ -71,3 +71,17 @@ Image: Example view of the PyVIC interface.
 This project is licensed under the MIT License. For more details, see the LICENSE file.
 
 GitHub: PyVIC Repository
+
+🛠️ Planned Features
+
+We are working to enhance PyVIC with the following features:
+
+	•	Cross-Platform Compatibility:
+	•	Improved support for Windows-based systems.
+	•	Customizable key mappings via configuration files.
+	•	German Keyboard Layout:
+	•	Extended support for German keyboard layout mapping, ensuring accurate input for special characters and regional key configurations.
+
+How to Contribute
+
+If you have ideas, suggestions, or want to help implement these features, feel free to open an issue or submit a pull request in the GitHub repository!
