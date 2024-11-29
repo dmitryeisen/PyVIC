@@ -1,69 +1,69 @@
 # PyVIC
 
-PyVIC (Python Virtual Input Console) ist eine Anwendung zur Simulation von HID-Geräten (Tastatur und Maus) und zur Echtzeit-Anzeige von Bildschirmdaten durch Kamera-Capturing. Dieses Tool bietet eine einfache Möglichkeit, Eingabegeräte und visuelle Rückmeldungen zu testen.
+PyVIC (Python Virtual Input Console) is an application for simulating HID devices (keyboard and mouse) and displaying real-time screen data via camera capturing. This tool provides a simple way to test input devices and visual feedback.
 
-🛠️ Funktionen
+🛠️ Features
 
-	•	KVM-Simulation:
-	•	Simuliert Tastatur- und Mauseingaben (HID).
-	•	Sende Bewegungen, Klicks und Tastenanschläge direkt an das Zielsystem.
-	•	Bildschirm-Capturing:
-	•	Zeigt Live-Frames von einer angeschlossenen Kamera an.
-	•	Unterstützt Echtzeit-Anzeige ohne merkbare Verzögerung.
-	•	Benutzerfreundlichkeit:
-	•	Kompatibel mit Linux und macOS.
-	•	Unterstützt Plug-and-Play für USB-Geräte.
+	•	KVM Simulation:
+	•	Simulates keyboard and mouse inputs (HID).
+	•	Sends movements, clicks, and keystrokes directly to the target system.
+	•	Screen Capturing:
+	•	Displays live frames from a connected camera.
+	•	Supports real-time display without noticeable delay.
+	•	User-Friendly:
+	•	Compatible with Linux and macOS.
+	•	Supports plug-and-play for USB devices.
 
 📦 Installation
 
-Voraussetzungen
+Requirements
 
-	•	Python 3.9 oder höher.
-	•	Abhängigkeiten:
+	•	Python 3.9 or higher.
+	•	Dependencies:
 	•	pygame
 	•	opencv-python
 	•	pyserial
 
-Installiere die Abhängigkeiten mit:
+Install dependencies with:
 
 pip install -r requirements.txt
 
-🚀 Verwendung
+🚀 Usage
 
-	1.	Starte die Anwendung:
+	1.	Start the application:
 
 python main.py
 
 
-	2.	Funktionen testen:
-	•	Verbinde HID-Geräte und eine USB-Kamera.
-	•	Teste Maus- und Tastatureingaben im Pygame-Fenster.
-	3.	App beenden:
-	•	Drücke Ctrl + C oder schließe das Fenster.
+	2.	Test functionality:
+	•	Connect HID devices and a USB camera.
+	•	Test mouse and keyboard inputs in the Pygame window.
+	3.	Exit the application:
+	•	Press Ctrl + C or close the window.
 
-⚙️ Konfiguration
+⚙️ Configuration
 
-HID-Geräte
+HID Devices
 
-Die App sucht automatisch nach USB-Serial-Geräten (usbserial, ttyUSB).
+The app automatically searches for USB serial devices (usbserial, ttyUSB).
 
-Kamera
+Camera
 
-Die erste verfügbare Kamera (/dev/video0 oder ID 0) wird standardmäßig verwendet. Um eine andere Kamera zu verwenden, passe die ID in main.py an:
+The first available camera (/dev/video0 or ID 0) is used by default. To use another camera, modify the ID in main.py:
 
 cap = cv2.VideoCapture(<CAMERA_ID>)
 
 🖥️ Screenshots
 
-Bild: Beispielansicht der PyVIC-Oberfläche.
+Image: Example view of the PyVIC interface.
 
-👥 Beitragende
+👥 Contributors
 
-	•	[Dmitry Eisen] – Projektentwickler
-	•	Vorschläge und Beiträge willkommen! Öffne ein Issue oder erstelle einen Pull-Request.
+	•	[Dmitry Eisen] – Project Developer
+	•	Suggestions and contributions are welcome! Open an issue or submit a pull request.
 
-📄 Lizenz
+📄 License
 
-Dieses Projekt steht unter der MIT-Lizenz. Weitere Details findest du in der Datei LICENSE.
+This project is licensed under the MIT License. For more details, see the LICENSE file.
 
 GitHub: PyVIC Repository
