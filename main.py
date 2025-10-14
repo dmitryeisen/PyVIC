@@ -84,23 +84,26 @@ async def test_unit(serial_conn, frame_width, frame_height, layout):
 
 async def handle_pygame_event(serial_conn, event, layout):
     if event.type == MOUSEMOTION:
-        abs_x, abs_y = event.pos  # Absolute Mausposition im Fenster
-        try:
-            mouse.move(serial_conn, abs_x, abs_y, relative=False)  # relative=False - absolute
-        except Exception as e:
-            print(f"Error while sending absolute MOUSEMOTION: {e}")
-        """
-        Relative Mouse
-        dx, dy = event.rel  # Relative mouse
-        dx = max(min(dx, 127), -127)  # CH9329 max. Value from -127 to 127
-        dy = max(min(dy, 127), -127)
-        # print(f"Mouse values: dx={dx}, dy={dy}")
-        try:
-            mouse.move(serial_conn, dx, dy, relative=True)
-        except Exception as e:
-            print(f"Error while sending absolute MOUSEMOTION: {e}")
+        mouse_mode_relative = True
+        if mouse_mode_relative:
+            # Relative Mausbewegung
+            dx, dy = event.rel  # Relative Bewegung
+            dx = max(min(dx, 127), -127)  # Begrenzen auf CH9329-Bereich
+            dy = max(min(dy, 127), -127)
+            print(f"Mouse values: dx={dx}, dy={dy}")
+            try:
+                mouse.move(serial_conn, dx, dy, relative=True)
+            except Exception as e:
+                print(f"Error while sending relative MOUSEMOTION: {e}")
+        else:
+            # Absolute Mausbewegung
+            abs_x, abs_y = event.pos
+            try:
+                mouse.move(serial_conn, abs_x, abs_y, relative=False)
+            except Exception as e:
+                print(f"Error while sending absolute MOUSEMOTION: {e}")
 
-        """
+
     elif event.type == KEYDOWN:
         key_code = event.unicode
         special_key = {
