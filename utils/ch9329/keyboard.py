@@ -8,11 +8,11 @@ from typing import Tuple
 
 from serial import Serial
 
-from ch9329.exceptions import InvalidKey
-from ch9329.exceptions import InvalidModifier
-from ch9329.exceptions import TooManyKeysError
-from ch9329.hid import HID_MAPPING
-from ch9329.utils import get_packet
+from .exceptions import InvalidKey
+from .exceptions import InvalidModifier
+from .exceptions import TooManyKeysError
+from .hid import HID_MAPPING
+from .utils import get_packet
 
 Modifier = Literal[
     "ctrl",

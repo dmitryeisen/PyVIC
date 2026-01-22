@@ -1,7 +1,7 @@
 import asyncio
 import pygame
 from pygame.locals import *
-from ch9329 import keyboard, mouse
+from utils.ch9329 import keyboard, mouse
 from serial import Serial
 import cv2
 import sys

@@ -6,7 +6,7 @@ from typing import Literal
 
 from serial import Serial
 
-from ch9329.utils import get_packet
+from .utils import get_packet
 
 MouseCtrl = Literal["null", "left", "right", "center"]
 
