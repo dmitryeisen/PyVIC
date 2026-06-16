@@ -2,8 +2,8 @@ from enum import Enum
 
 from serial import Serial
 
-from ch9329.exceptions import ProtocolError
-from ch9329.utils import get_packet
+from .exceptions import ProtocolError
+from .utils import get_packet
 
 HEAD = b"\x57\xab"  # Frame header
 ADDR = b"\x00"  # Address
@@ -28,6 +28,82 @@ class USBStringDescriptor(Enum):
 
 
 CMD_SET_USB_STRING = b"\x0b"
+
+PARA_CFG_DATA_LEN = 50
+RESPONSE_SET_PARA_CFG = b"W\xab\x00\x89\x01\x00\x8c"
+
+
+class WorkingMode(Enum):
+    KEYBOARD_MOUSE_CUSTOM_HID = 0
+    KEYBOARD_ONLY = 1
+    KEYBOARD_MOUSE = 2
+    CUSTOM_HID_ONLY = 3
+
+
+class CommunicationMode(Enum):
+    PROTOCOL = 0
+    ASCII = 1
+    TRANSPARENT = 2
+
+
+def _read_para_cfg(ser: Serial) -> bytearray:
+    ser.readall()
+    packet = get_packet(
+        HEAD, ADDR, CMD_GET_PARA_CFG, LEN_GET_PARA_CFG, DATA_GET_PARA_CFG
+    )
+    ser.write(packet)
+    received_packet = ser.readline()
+    if len(received_packet) < 56:
+        raise ProtocolError(
+            "expected at least 56 bytes in GET_PARA_CFG response, "
+            f"received {len(received_packet)}"
+        )
+    return bytearray(received_packet[5:55])
+
+
+def _write_para_cfg(ser: Serial, data: bytes) -> None:
+    if len(data) != PARA_CFG_DATA_LEN:
+        raise ValueError(
+            f"expected {PARA_CFG_DATA_LEN} bytes of config data, got {len(data)}"
+        )
+    modified_packet = get_packet(
+        HEAD, ADDR, CMD_SET_PARA_CFG, LEN_SET_PARA_CFG, data
+    )
+    ser.write(modified_packet)
+    return_packet = ser.readline()
+    if return_packet != RESPONSE_SET_PARA_CFG:
+        raise ProtocolError(
+            f"expected response {RESPONSE_SET_PARA_CFG}, received {return_packet}"
+        )
+
+
+def get_working_mode(ser: Serial) -> WorkingMode:
+    return WorkingMode(_read_para_cfg(ser)[0])
+
+
+def set_working_mode(ser: Serial, mode: WorkingMode) -> bool:
+    config = _read_para_cfg(ser)
+    if (
+        config[0] == mode.value
+        and config[1] == CommunicationMode.PROTOCOL.value
+    ):
+        return False
+    config[0] = mode.value
+    config[1] = CommunicationMode.PROTOCOL.value
+    _write_para_cfg(ser, bytes(config))
+    return True
+
+
+def configure_keyboard_mouse_only(ser: Serial) -> bool:
+    changed = set_working_mode(ser, WorkingMode.KEYBOARD_MOUSE)
+    if changed:
+        print(
+            "CH9329 configured for USB keyboard + mouse (mode 2). "
+            "Reconnect USB if the device does not respond."
+        )
+    else:
+        print("CH9329 already in USB keyboard + mouse mode (mode 2).")
+    return changed
 
 
 def set_device_descriptors(
@@ -125,36 +201,11 @@ def get_product(ser: Serial):
 def set_device_ids(
     ser: Serial, vid: int, pid: int, custom_descriptor: bool = False
 ):
-    # this packet is sent to ch9329 in response to which it sends the
-    # current configuration
-    packet = get_packet(
-        HEAD, ADDR, CMD_GET_PARA_CFG, LEN_GET_PARA_CFG, DATA_GET_PARA_CFG
-    )
-    ser.write(packet)
-    received_packet = ser.readline()  # read the current configuration
-    vid_bytes = vid.to_bytes(
-        2, "little"
-    )  # Convert VID to little-endian 2-byte format
-    pid_bytes = pid.to_bytes(
-        2, "little"
-    )  # Convert PID to little-endian 2-byte format
-    modified_data = (
-        received_packet[5:16] + vid_bytes + pid_bytes + received_packet[20:55]
-    )  # Replace VID and PID bytes
+    config = _read_para_cfg(ser)
+    vid_bytes = vid.to_bytes(2, "little")
+    pid_bytes = pid.to_bytes(2, "little")
+    config[11:13] = vid_bytes
+    config[13:15] = pid_bytes
     if custom_descriptor:
-        modified_data = (
-            modified_data[:35] + USB_STRING_ENABLE_FLAG + modified_data[36:]
-        )
-    modified_packet = get_packet(
-        HEAD, ADDR, CMD_SET_PARA_CFG, LEN_SET_PARA_CFG, modified_data
-    )
-    # Send modified packet with the new VID and PID
-    ser.write(modified_packet)
-    return_packet = ser.readline()  # Read the response packet
-    # this packet is expected in response when the VID and PID are
-    # successfully set
-    expected_packet = b"W\xab\x00\x89\x01\x00\x8c"
-    if return_packet != expected_packet:
-        raise ProtocolError(
-            f"expected response {expected_packet}, received {return_packet}"
-        )
+        config[36] = USB_STRING_ENABLE_FLAG[0]
+    _write_para_cfg(ser, bytes(config))

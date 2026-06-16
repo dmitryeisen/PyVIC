@@ -2,6 +2,7 @@ import asyncio
 import pygame
 from pygame.locals import *
 from utils.ch9329 import keyboard, mouse
+from utils.ch9329.config import configure_keyboard_mouse_only
 from serial import Serial
 import cv2
 import sys
@@ -31,8 +32,10 @@ def find_usbserial_port():
 def setup_ch9329_serial():
     try:
         port = find_usbserial_port()
-        ser = Serial(port=port, baudrate=9600, timeout=0, write_timeout=0.1)
+        ser = Serial(port=port, baudrate=9600, timeout=0.1, write_timeout=0.1)
         print("CH9329 connected.")
+        configure_keyboard_mouse_only(ser)
+        ser.timeout = 0
         return ser
     except Exception as e:
         print(f"Error CH9329: {e}")

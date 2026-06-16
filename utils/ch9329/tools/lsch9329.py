@@ -6,7 +6,7 @@ import serial.serialutil
 import serial.tools.list_ports
 from serial import Serial
 
-from ch9329.config import get_serial_number
+from utils.ch9329.config import get_serial_number
 
 
 def main():
@@ -18,7 +18,7 @@ def main():
         if i.vid == 6790 and i.pid == 29987:
             try:
                 ser = Serial(i.device, 9600, timeout=0.05)
-                print("Parsing serail number...")
+                print("Parsing serial number...")
                 serial_number = get_serial_number(ser)
                 ser.close()
             except (serial.serialutil.SerialException, UnicodeDecodeError):
