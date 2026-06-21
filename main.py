@@ -2,50 +2,90 @@ import asyncio
 import pygame
 from pygame.locals import *
 from utils.ch9329 import keyboard, mouse
-from utils.ch9329.config import configure_keyboard_mouse_only
-from serial import Serial
+from utils.ch9329.config import (
+    USB_PRODUCT_NAME,
+    USB_VENDOR_NAME,
+    WORKING_MODE_LABELS,
+    apply_working_mode,
+    connect_and_configure,
+    find_ch9329_port,
+    set_usb_identity,
+)
+from utils.ch9329.exceptions import ProtocolError
+from utils.startup_menu import StartupConfig, run_startup_menu
 import cv2
 import sys
-import serial.tools.list_ports
 import threading
 from utils import map_to_de, detect_keyboard_layout
 
 
-def find_usbserial_port():
-    """
-    Searches for a serial device with 'usbserial' in the name.
-    Works on Linux and macOS.
-    """
-    ports = serial.tools.list_ports.comports()
-    usbserial_ports = [
-        port.device for port in ports if "usbserial" in port.device.lower() or "ttyusb" in port.device.lower()
-    ]
+def setup_ch9329_serial(config: StartupConfig):
+    port = find_ch9329_port()
+    print(f"CH9329 port: {port}")
+    ser, active_baudrate, changed, method = connect_and_configure(
+        port, config.working_mode, config.baudrate
+    )
+    mode_label = WORKING_MODE_LABELS[config.working_mode]
 
-    if len(usbserial_ports) == 1:
-        return usbserial_ports[0]
-    elif len(usbserial_ports) == 0:
-        raise Exception("No USB-serial device found.")
+    if method.startswith("hid_only"):
+        print(
+            f"Warnung: Modus-Config beim Start fehlgeschlagen. "
+            f"HID startet trotzdem ({active_baudrate} baud)."
+        )
+
+    manufacturer = config.manufacturer
+    product = config.product
+    identity_method = set_usb_identity(ser, manufacturer, product)
+    if identity_method == "confirmed":
+        print(f"USB gesetzt: Hersteller={manufacturer}, Produkt={product}")
     else:
-        raise Exception("Multiple USB-serial devices found. Please specify.")
+        print(
+            f"USB gesendet: Hersteller={manufacturer}, Produkt={product}. "
+            "USB am Zielrechner neu verbinden."
+        )
 
+    if method.startswith("hid_only"):
+        try:
+            changed = apply_working_mode(ser, config.working_mode)
+            method = "read_write_retry"
+        except ProtocolError as error:
+            print(f"Moduswechsel weiterhin fehlgeschlagen: {error}")
+            changed = False
 
-def setup_ch9329_serial():
-    try:
-        port = find_usbserial_port()
-        ser = Serial(port=port, baudrate=9600, timeout=0.1, write_timeout=0.1)
-        print("CH9329 connected.")
-        configure_keyboard_mouse_only(ser)
-        ser.timeout = 0
-        return ser
-    except Exception as e:
-        print(f"Error CH9329: {e}")
-        return None
+    if method == "read_write" and not changed:
+        print(f"CH9329 Modus bereits aktiv: {mode_label}, {active_baudrate} baud.")
+    elif changed:
+        print(
+            f"CH9329 Modus gesetzt ({method}): {mode_label}, {active_baudrate} baud. "
+            "USB am Zielrechner neu verbinden."
+        )
+    elif not method.startswith("hid_only"):
+        print(f"CH9329 verbunden ({method}): {mode_label}, {active_baudrate} baud.")
+
+    if active_baudrate != config.baudrate:
+        print(
+            f"Hinweis: verbunden mit {active_baudrate} baud "
+            f"(Menü: {config.baudrate})."
+        )
+    return ser
 
 
 latest_frame = None
 frame_lock = threading.Lock()
 stop_capture = False
 layout = "us"
+
+SPECIAL_KEYS = {
+    pygame.K_RETURN: "enter",
+    pygame.K_BACKSPACE: "backspace",
+    pygame.K_DELETE: "delete",
+    pygame.K_TAB: "tab",
+    pygame.K_ESCAPE: "escape",
+    pygame.K_UP: "arrow_up",
+    pygame.K_DOWN: "arrow_down",
+    pygame.K_LEFT: "arrow_left",
+    pygame.K_RIGHT: "arrow_right",
+}
 
 
 def capture_frames_thread(cap):
@@ -59,10 +99,10 @@ def capture_frames_thread(cap):
             latest_frame = frame
 
 
-async def test_unit(serial_conn, frame_width, frame_height, layout):
+async def test_unit(serial_conn, frame_width, frame_height, layout, config: StartupConfig):
     global latest_frame
     pygame.init()
-    # screen = pygame.display.set_mode((frame_width, frame_height))
+    pygame.event.clear()
     screen = pygame.display.set_mode((frame_width, frame_height), pygame.HWSURFACE | pygame.DOUBLEBUF)
     pygame.display.set_caption("PyVIC")
     pygame.mouse.set_visible(False)
@@ -74,52 +114,48 @@ async def test_unit(serial_conn, frame_width, frame_height, layout):
             if event.type == QUIT:
                 running = False
             elif event.type in {MOUSEMOTION, MOUSEBUTTONDOWN, MOUSEBUTTONUP, KEYDOWN, KEYUP}:
-                await handle_pygame_event(serial_conn, event, layout)
+                await handle_pygame_event(
+                    serial_conn, event, layout, config, frame_width, frame_height
+                )
 
         with frame_lock:
             if latest_frame is not None:
                 frame_surface = pygame.surfarray.make_surface(latest_frame.swapaxes(0, 1))
-                # frame_surface = pygame.image.frombuffer(latest_frame.tobytes(), latest_frame.shape[1::-1], "RGB")
                 screen.blit(frame_surface, (0, 0))
 
         pygame.display.flip()
         clock.tick(60)
 
-async def handle_pygame_event(serial_conn, event, layout):
+
+async def handle_pygame_event(
+    serial_conn, event, layout, config: StartupConfig, frame_width, frame_height
+):
     if event.type == MOUSEMOTION:
-        mouse_mode_relative = True
-        if mouse_mode_relative:
-            # Relative Mausbewegung
-            dx, dy = event.rel  # Relative Bewegung
-            dx = max(min(dx, 127), -127)  # Begrenzen auf CH9329-Bereich
+        if config.mouse_relative:
+            dx, dy = event.rel
+            dx = max(min(dx, 127), -127)
             dy = max(min(dy, 127), -127)
-            print(f"Mouse values: dx={dx}, dy={dy}")
             try:
                 mouse.move(serial_conn, dx, dy, relative=True)
             except Exception as e:
                 print(f"Error while sending relative MOUSEMOTION: {e}")
         else:
-            # Absolute Mausbewegung
             abs_x, abs_y = event.pos
             try:
-                mouse.move(serial_conn, abs_x, abs_y, relative=False)
+                mouse.move(
+                    serial_conn,
+                    abs_x,
+                    abs_y,
+                    relative=False,
+                    monitor_width=frame_width,
+                    monitor_height=frame_height,
+                )
             except Exception as e:
                 print(f"Error while sending absolute MOUSEMOTION: {e}")
 
-
     elif event.type == KEYDOWN:
+        special_key = SPECIAL_KEYS.get(event.key)
         key_code = event.unicode
-        special_key = {
-            pygame.K_RETURN: "enter",
-            pygame.K_BACKSPACE: "backspace",
-            pygame.K_DELETE: "delete",
-            pygame.K_TAB: "tab",
-            pygame.K_ESCAPE: "escape",
-            pygame.K_UP: "arrow_up",
-            pygame.K_DOWN: "arrow_down",
-            pygame.K_LEFT: "arrow_left",
-            pygame.K_RIGHT: "arrow_right",
-        }.get(event.key, None)
         try:
             if special_key:
                 keyboard.press(serial_conn, special_key)
@@ -129,20 +165,16 @@ async def handle_pygame_event(serial_conn, event, layout):
                     keyboard.press(serial_conn, key_to_send)
                 else:
                     keyboard.press(serial_conn, key_code)
-
         except Exception as e:
-            print(f"Error while sending KEYDOWN:: {e}")
+            print(f"Error while sending KEYDOWN: {e}")
 
     elif event.type == KEYUP:
-        key_code = event.unicode
         try:
-            if key_code:
-                keyboard.release(serial_conn)
+            keyboard.release(serial_conn)
         except Exception as e:
             print(f"Error while sending KEYUP: {e}")
 
     elif event.type == MOUSEBUTTONDOWN:
-        # Translate Pygame-Mouse-Buttons to CH9329-Button
         mouse_button_map = {1: "left", 2: "middle", 3: "right"}
         mouse_button = mouse_button_map.get(event.button, None)
         if mouse_button:
@@ -154,7 +186,6 @@ async def handle_pygame_event(serial_conn, event, layout):
             print(f"Unknown mouse button: {event.button}")
 
     elif event.type == MOUSEBUTTONUP:
-        mouse_button = event.button
         try:
             mouse.release(serial_conn)
         except Exception as e:
@@ -164,26 +195,40 @@ async def handle_pygame_event(serial_conn, event, layout):
 async def main():
     global layout
     global stop_capture
+
+    config = run_startup_menu()
+    if config is None:
+        print("Start abgebrochen.")
+        return
+
     layout = detect_keyboard_layout()
+
+    try:
+        serial_conn = setup_ch9329_serial(config)
+    except Exception as e:
+        print(f"Error CH9329: {e}")
+        return
+
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Error while opening the camera.")
+        serial_conn.close()
         sys.exit()
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     capture_thread = threading.Thread(target=capture_frames_thread, args=(cap,), daemon=True)
     capture_thread.start()
-    serial_conn = setup_ch9329_serial()
-    if serial_conn:
-        try:
-            await test_unit(serial_conn, frame_width, frame_height, layout)
-        finally:
-            stop_capture = True
-            capture_thread.join()
-            cap.release()
-            pygame.quit()
-            print("Connection and camera closed.")
+
+    try:
+        await test_unit(serial_conn, frame_width, frame_height, layout, config)
+    finally:
+        stop_capture = True
+        capture_thread.join()
+        cap.release()
+        serial_conn.close()
+        pygame.quit()
+        print("Connection and camera closed.")
 
 
 if __name__ == "__main__":
